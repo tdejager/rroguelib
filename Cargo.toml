@@ -1,0 +1,27 @@
+[package]
+name = "roguelib"
+version = "0.1.0"
+authors = ["Tim de Jager"]
+
+[dependencies]
+arrayvec = { version = "0.4", default-features = false }
+stb_truetype = "0.2.2"
+ordered-float = "0.5"
+approx = { version = "0.3", default-features = false }
+linked-hash-map = { version = "0.5", optional = true }
+rustc-hash = { version = "1", optional = true }
+glium = "0.22"
+unicode-normalization = "0.1"
+
+
+[dependencies.rusttype]
+version = "0.7.2"
+features = ["gpu_cache"]
+
+[lib]
+name = "roguelib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "roguelike"
+path = "src/main.rs"
