@@ -99,8 +99,7 @@ fn create_text_program(display: &glium::Display) -> glium::program::Program {
 fn create_text_vb(display: &glium::Display, glyphs: &Vec<PositionedGlyph>, cache: &Cache) -> glium::VertexBuffer<TextVertex>
 {
     let vertex_buffer = {
-
-        let colour = [0.0, 0.0, 0.0, 1.0];
+        let colour = [1.0, 1.0, 1.0, 1.0];
         let (screen_width, screen_height) = {
             let (w, h) = display.get_framebuffer_dimensions();
             (w as f32, h as f32)
@@ -110,7 +109,6 @@ fn create_text_vb(display: &glium::Display, glyphs: &Vec<PositionedGlyph>, cache
             .iter()
             .flat_map(|g| {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, g) {
-                    println!("Positioned glyph {:?}", g);
                     let gl_rect = Rect {
                         min: origin
                             + (vector(
@@ -164,7 +162,6 @@ fn create_text_vb(display: &glium::Display, glyphs: &Vec<PositionedGlyph>, cache
     };
 
     vertex_buffer
-
 }
 
 
@@ -177,8 +174,8 @@ fn layout_grid<'a>(font: &'a Font, scale: Scale, width: u32, text: &str)
 
     let mut caret = point(0.0, v_metrics.ascent);
 
-
-    let advance_height = 100.0;
+    let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
+    println!("advance height {}", advance_height - v_metrics.line_gap);
 
     for c in text.nfc() {
         let base_glyph = font.glyph(c);
@@ -190,6 +187,7 @@ fn layout_grid<'a>(font: &'a Font, scale: Scale, width: u32, text: &str)
                 glyph = glyph.into_unpositioned().positioned(caret);
             } else {
                 caret.x += glyph.unpositioned().h_metrics().advance_width as f32;
+                println!("Glyph {} height {}", c, bb.height());
             }
         }
         result.push(glyph);
@@ -203,32 +201,32 @@ fn rescale(f: f32) -> f32 {
 }
 
 fn create_grid(
-    width: u32,
-    height: u32,
-    grid_x: u32,
-    grid_y: u32,
+    width: f32,
+    height: f32,
+    grid_x: f32,
+    grid_y: f32,
     display: &glium::Display,
 ) -> (glium::VertexBuffer<Vertex>, glium::IndexBuffer<u16>) {
     let mut vertices: Vec<Vertex> = Vec::new();
 
-    for y in (0..height).step_by(grid_y as usize) {
+    for y in 0..(height/ grid_y) as u32 {
         vertices.push(Vertex {
-            position: [-1.0, -rescale(y as f32 / height as f32)],
+            position: [-1.0, -rescale(y as f32 * grid_y / height)],
             color: [1.0, 1.0, 1.0],
         });
         vertices.push(Vertex {
-            position: [1.0, -rescale(y as f32 / height as f32)],
+            position: [1.0, -rescale(y as f32 * grid_y / height)],
             color: [1.0, 1.0, 1.0],
         });
     }
 
-    for x in (0..width).step_by(grid_x as usize) {
+    for x in 0..(width / grid_x) as u32 {
         vertices.push(Vertex {
-            position: [rescale(x as f32 / width as f32), -1.0],
+            position: [rescale(x as f32 * grid_x / width), -1.0],
             color: [1.0, 1.0, 1.0],
         });
         vertices.push(Vertex {
-            position: [rescale(x as f32 / width as f32), 1.0],
+            position: [rescale(x as f32 * grid_x / width), 1.0],
             color: [1.0, 1.0, 1.0],
         });
     }
@@ -289,9 +287,16 @@ fn main() -> Result<(), Box<Error>> {
     use unicode_normalization::UnicodeNormalization;
     let box_char: String = "█".into();
 
-    let mut max_font_height = 0;
+    let mut max_font_height = 0.0;
+    let mut max_font_width = 0.0;
+
     for c in box_char.nfc() {
-      max_font_height = font.glyph(c).scaled(Scale::uniform(24.0 * dpi_factor as f32)).positioned(point(0.0, 0.0)).pixel_bounding_box().unwrap().height()
+        let v_metrics = font.v_metrics(Scale::uniform(24.0 * dpi_factor as f32));
+        let glyph = font.glyph(c).scaled(Scale::uniform(24.0 * dpi_factor as f32));
+        let bounding_box = glyph.clone().positioned(point(0.0, 0.0)).pixel_bounding_box().unwrap();
+
+        max_font_height = (v_metrics.ascent - v_metrics.descent);
+        max_font_width = glyph.h_metrics().advance_width;
     };
 
 //    let max_font_height = font.glyph("█".into().nfc()[0]).scaled(Scale::uniform(24.0 * dpi_factor as f32)).positioned(point(0.0, 0.0)).pixel_bounding_box().unwrap().height();
@@ -301,10 +306,10 @@ fn main() -> Result<(), Box<Error>> {
     let grid_program = create_grid_program(&display);
     println!("Creating a grid with w: {} and h: {}", width, height);
     let (vb_grid, ib_grid) = create_grid(
-        width,
-        height,
-        12 * dpi_factor as u32,
-        max_font_height as u32,
+        width as f32,
+        height as f32,
+        max_font_width,
+        max_font_height,
         &display,
     );
 
@@ -314,7 +319,8 @@ fn main() -> Result<(), Box<Error>> {
         .dimensions(cache_width, cache_height)
         .build();
 
-    let text: String = "Halllooo ben jij bas?".into();
+    let text: String = "Halllooo ben jij bas? █".into();
+
     let glyphs = layout_grid(&font,
                              Scale::uniform(24.0 * dpi_factor as f32), width, &text);
 
@@ -353,13 +359,11 @@ fn main() -> Result<(), Box<Error>> {
     })?;
 
 
-
     let text_programs = create_text_program(&display);
     let text_vertex_buffer = create_text_vb(&display, &glyphs, &cache);
     let text_uniforms = uniform! {
             tex: cache_tex.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
         };
-
 
 
     loop {
@@ -371,11 +375,11 @@ fn main() -> Result<(), Box<Error>> {
                     WindowEvent::CloseRequested => finished = true,
                     WindowEvent::KeyboardInput {
                         input:
-                            KeyboardInput {
-                                state: ElementState::Pressed,
-                                virtual_keycode: Some(keypress),
-                                ..
-                            },
+                        KeyboardInput {
+                            state: ElementState::Pressed,
+                            virtual_keycode: Some(keypress),
+                            ..
+                        },
                         ..
                     } => match keypress {
                         VirtualKeyCode::Escape => finished = true,
@@ -390,7 +394,7 @@ fn main() -> Result<(), Box<Error>> {
         }
 
         let mut target = display.draw();
-        target.clear_color(0.5, 0.5, 0.5, 1.0);
+        target.clear_color(0.0, 0.0, 0.0, 1.0);
 
         // Draw the grid lines
         target.draw(&vb_grid,
