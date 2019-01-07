@@ -11,138 +11,10 @@ use rusttype::gpu_cache::Cache;
 use std::borrow::Cow;
 use std::error::Error;
 
-#[derive(Copy, Clone)]
-struct Vertex {
-    position: [f32; 2],
-    color: [f32; 3],
-}
+mod program;
+mod vertex;
 
-implement_vertex!(Vertex, position, color);
-
-#[derive(Copy, Clone)]
-struct TextVertex {
-    position: [f32; 2],
-    tex_coords: [f32; 2],
-    colour: [f32; 4],
-}
-
-struct Grid {
-    /// Width of the grid
-    width: f32,
-    /// Height of the grid
-    height: f32,
-    /// Height of a cell in the x direction
-    grid_x: f32,
-    /// Height of a cell in the y direction
-    grid_y: f32,
-    /// Number of cells in the y direction
-    cells_y: u32,
-    /// Number of cells in the x direction
-    cells_x: u32,
-}
-
-struct GridCell {
-    cell_height: f32,
-    cell_width: f32,
-    x: f32,
-    y: f32,
-}
-
-impl Grid {
-    /// Create a new grid function
-    fn new(width: f32, height: f32, grid_x: f32, grid_y: f32) -> Grid {
-        return Grid {
-            width,
-            height,
-            grid_x,
-            grid_y,
-            cells_y: (height / grid_y) as u32,
-            cells_x: (width / grid_x) as u32,
-        };
-    }
-
-    /// Return the grid cell by a 1D index
-    fn by_index(&self, index: u32) -> GridCell {
-        let y_idx = index / self.cells_x;
-        let x_idx = index % self.cells_x;
-
-        // Returns the top left corner of the grid cell
-        return GridCell {
-            cell_width: self.grid_x,
-            cell_height: self.grid_y,
-            x: x_idx as f32 * self.grid_x,
-            y: y_idx as f32 * self.grid_y,
-        };
-    }
-}
-
-implement_vertex!(TextVertex, position, tex_coords, colour);
-
-fn create_grid_program(display: &glium::Display) -> glium::program::Program {
-    let program = program!(display,
-     140 => {
-        vertex: "
-                #version 140
-                uniform mat4 matrix;
-                in vec2 position;
-                in vec3 color;
-                out vec3 vColor;
-                void main() {
-                    gl_Position = vec4(position, 0.0, 1.0) * matrix;
-                    vColor = color;
-                }
-            ",
-
-            fragment: "
-                #version 140
-                in vec3 vColor;
-                out vec4 f_color;
-                void main() {
-                    f_color = vec4(vColor, 1.0);
-                }
-            "
-            }
-    );
-
-    program.unwrap()
-}
-
-fn create_text_program(display: &glium::Display) -> glium::program::Program {
-    let program = program!(
-        display,
-        140 => {
-            vertex: "
-                #version 140
-
-                in vec2 position;
-                in vec2 tex_coords;
-                in vec4 colour;
-
-                out vec2 v_tex_coords;
-                out vec4 v_colour;
-
-                void main() {
-                    gl_Position = vec4(position, 0.0, 1.0);
-                    v_tex_coords = tex_coords;
-                    v_colour = colour;
-                }
-            ",
-
-            fragment: "
-                #version 140
-                uniform sampler2D tex;
-                in vec2 v_tex_coords;
-                in vec4 v_colour;
-                out vec4 f_colour;
-
-                void main() {
-                    f_colour = v_colour * vec4(1.0, 1.0, 1.0, texture(tex, v_tex_coords).r);
-                }
-            "
-        });
-
-    program.unwrap()
-}
+use self::vertex::{TextVertex, Vertex};
 
 fn create_text_vb(
     display: &glium::Display,
@@ -248,6 +120,7 @@ fn layout_grid<'a>(
     return result;
 }
 
+/// Rescale from 0..1 to -1..1
 fn rescale(f: f32) -> f32 {
     -1 as f32 + (f / 1.0 as f32) * 2 as f32
 }
@@ -357,8 +230,7 @@ fn main() -> Result<(), Box<Error>> {
         .dimensions(cache_width, cache_height)
         .build();
 
-    //    let text: String = "Halllooo ben jij bas? █ ╦═══╦═══════".into();
-    let text: String = "╣╤╤╬ ╭∩╮（︶︿︶）╭∩╮".into();
+    let text: String = "Halllooo ben jij bas? █ ╦═══╦═══════".into();
 
     let glyphs = layout_grid(&font, scale, width, &text);
 
@@ -396,8 +268,9 @@ fn main() -> Result<(), Box<Error>> {
         );
     })?;
 
-    let grid_program = create_grid_program(&display);
-    let text_programs = create_text_program(&display);
+    let grid_program = program::create_grid_program(&display);
+    let text_programs = program::create_text_program(&display);
+
     let text_uniforms = uniform! {
         tex: cache_tex.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
     };
@@ -407,7 +280,7 @@ fn main() -> Result<(), Box<Error>> {
 
     loop {
         event_loop.poll_events(|event| {
-            use glutin::*;
+            use self::glutin::*;
 
             if let Event::WindowEvent { event, .. } = event {
                 match event {
