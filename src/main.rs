@@ -3,7 +3,7 @@ extern crate glium;
 extern crate rusttype;
 extern crate unicode_normalization;
 
-use rusttype::gpu_cache::CacheBuilder;
+//use rusttype::gpu_cache::CacheBuilder;
 use rusttype::{point, vector, Font, PositionedGlyph, Rect, Scale};
 
 use glium::{glutin, Surface};
@@ -15,6 +15,7 @@ mod program;
 mod vertex;
 
 use self::vertex::{TextVertex, Vertex};
+use roguelib::Roguelib;
 
 fn create_text_vb(
     display: &glium::Display,
@@ -167,28 +168,23 @@ fn create_grid(
 }
 
 fn main() -> Result<(), Box<Error>> {
-    let window = glutin::WindowBuilder::new()
-        .with_dimensions((1920, 1080).into())
-        .with_title("RogueLike test");
+
+    let mut roguelib = Roguelib::new("roguelike");
 
     let font_data = include_bytes!("../fonts/consola.ttf");
     let font = Font::from_bytes(font_data as &[u8])?;
 
-    let context = glutin::ContextBuilder::new().with_vsync(true);
-    let mut event_loop = glutin::EventsLoop::new();
-    let display = glium::Display::new(window, context, &event_loop)?;
-
     // Get the dpi factor
-    let dpi_factor = display.gl_window().get_hidpi_factor();
+    let dpi_factor = roguelib.display.gl_window().get_hidpi_factor();
 
-    let (width, height): (u32, u32) = display
+    let (width, height): (u32, u32) = roguelib.display
         .gl_window()
         .get_inner_size()
         .ok_or("get_inner_size")?
         .to_physical(dpi_factor)
         .into();
 
-    println!("Pre dpi width {:?}", display.gl_window().get_inner_size());
+    println!("Pre dpi width {:?}", roguelib.display.gl_window().get_inner_size());
 
     let mut finished = false;
 
@@ -205,7 +201,7 @@ fn main() -> Result<(), Box<Error>> {
     //let max_font_height = font.glyph("█").scaled(Scale::uniform(24.0 * dpi_factor as f32))
     let scale = Scale::uniform(20.0 * dpi_factor as f32);
     let v_metrics = font.v_metrics(scale);
-    let font_height = v_metrics.ascent + v_metrics.descent;
+    let _font_height = v_metrics.ascent + v_metrics.descent;
 
     use unicode_normalization::UnicodeNormalization;
     let box_char: String = "█".into();
@@ -216,7 +212,7 @@ fn main() -> Result<(), Box<Error>> {
 
     for c in box_char.nfc() {
         let glyph = font.glyph(c).scaled(scale);
-        let bounding_box = glyph
+        let _bounding_box = glyph
             .clone()
             .positioned(point(0.0, 0.0))
             .pixel_bounding_box()
@@ -236,7 +232,7 @@ fn main() -> Result<(), Box<Error>> {
 
     // Create the texture
     let cache_tex = glium::texture::Texture2d::with_format(
-        &display,
+        &roguelib.display,
         glium::texture::RawImage2d {
             data: Cow::Owned(vec![128u8; cache_width as usize * cache_height as usize]),
             width: cache_width,
@@ -247,10 +243,12 @@ fn main() -> Result<(), Box<Error>> {
         glium::texture::MipmapsOption::NoMipmap,
     )?;
 
+    // Queue the glyphs in the program
     for glyph in &glyphs {
         cache.queue_glyph(0, glyph.clone());
     }
 
+    // Cache the rects
     cache.cache_queued(|rect, data| {
         cache_tex.main_level().write(
             glium::Rect {
@@ -268,18 +266,23 @@ fn main() -> Result<(), Box<Error>> {
         );
     })?;
 
-    let grid_program = program::create_grid_program(&display);
-    let text_programs = program::create_text_program(&display);
+    // Create the shaders
+    let grid_program = program::create_grid_program(&roguelib.display);
+    let text_programs = program::create_text_program(&roguelib.display);
 
+    // Set the text uniforms
     let text_uniforms = uniform! {
         tex: cache_tex.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
     };
 
-    let mut text_vertex_buffer = create_text_vb(&display, &glyphs, &cache);
-    let (mut vb_grid, mut ib_grid) = create_grid(max_font_width, max_font_height, &display);
+    // Create he vertex buffer and the grid
+    let mut text_vertex_buffer = create_text_vb(&roguelib.display, &glyphs, &cache);
+    let (mut vb_grid, mut ib_grid) = create_grid(max_font_width, max_font_height, &roguelib.display);
 
+    // Receive the inputs
     loop {
-        event_loop.poll_events(|event| {
+        let display = &roguelib.display;
+        roguelib.event_loop.poll_events(|event| {
             use self::glutin::*;
 
             if let Event::WindowEvent { event, .. } = event {
@@ -289,8 +292,8 @@ fn main() -> Result<(), Box<Error>> {
                         let dpi_factor = display.gl_window().get_hidpi_factor();
 
                         // Reset the vertex buffers
-                        text_vertex_buffer = create_text_vb(&display, &glyphs, &cache);
-                        let grid = create_grid(max_font_width, max_font_height, &display);
+                        text_vertex_buffer = create_text_vb(display, &glyphs, &cache);
+                        let grid = create_grid(max_font_width, max_font_height, display);
 
                         vb_grid = grid.0;
                         ib_grid = grid.1;
@@ -315,7 +318,7 @@ fn main() -> Result<(), Box<Error>> {
             break;
         }
 
-        let mut target = display.draw();
+        let mut target = roguelib.display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
 
         // Draw the grid lines

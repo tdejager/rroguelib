@@ -31,9 +31,9 @@ pub fn create_grid_program(display: &glium::Display) -> glium::program::Program 
 
 pub fn create_text_program(display: &glium::Display) -> glium::program::Program {
     let program = program!(
-        display,
-        140 => {
-            vertex: "
+    display,
+    140 => {
+        vertex: "
                 #version 140
 
                 in vec2 position;
@@ -50,7 +50,7 @@ pub fn create_text_program(display: &glium::Display) -> glium::program::Program 
                 }
             ",
 
-            fragment: "
+        fragment: "
                 #version 140
                 uniform sampler2D tex;
                 in vec2 v_tex_coords;
@@ -61,7 +61,7 @@ pub fn create_text_program(display: &glium::Display) -> glium::program::Program 
                     f_colour = v_colour * vec4(1.0, 1.0, 1.0, texture(tex, v_tex_coords).r);
                 }
             "
-        });
+    });
 
     program.unwrap()
 }
