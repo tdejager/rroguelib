@@ -2,7 +2,7 @@
 extern crate glium;
 extern crate rusttype;
 
-use glium::{glutin, Surface};
+use glium::{glutin};
 mod fonts;
 
 pub struct Roguelib {
@@ -19,7 +19,7 @@ impl Roguelib {
             .with_title(title);
 
         let context = glutin::ContextBuilder::new().with_vsync(true);
-        let mut event_loop = glutin::EventsLoop::new();
+        let event_loop = glutin::EventsLoop::new();
         let display = glium::Display::new(window, context, &event_loop).unwrap();
 
         Roguelib{display, event_loop }

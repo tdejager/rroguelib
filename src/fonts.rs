@@ -1,4 +1,4 @@
-use rusttype::gpu_cache::CacheBuilder;
+
 use rusttype::{point, vector, Font, PositionedGlyph, Rect, Scale};
 
 /// Load font from font data path

@@ -288,8 +288,8 @@ fn main() -> Result<(), Box<Error>> {
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::CloseRequested => finished = true,
-                    WindowEvent::Resized(logical_size) => {
-                        let dpi_factor = display.gl_window().get_hidpi_factor();
+                    WindowEvent::Resized(_logical_size) => {
+                        let _dpi_factor = display.gl_window().get_hidpi_factor();
 
                         // Reset the vertex buffers
                         text_vertex_buffer = create_text_vb(display, &glyphs, &cache);
