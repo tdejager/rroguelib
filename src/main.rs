@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<Error>> {
     let window = roguelib::create_window("roguelike");
 
     let mut event_loop = glutin::EventsLoop::new();
-    let mut context = glutin::ContextBuilder::new().with_vsync(true);
+    let context = glutin::ContextBuilder::new().with_vsync(true);
     let display = glium::Display::new(window, context, &event_loop).unwrap();
     let mut roguelib = Roguelib::new(&display);
 
