@@ -16,7 +16,7 @@ unicode-normalization = "0.1"
 
 
 [dependencies.rusttype]
-version = "0.7.2"
+version = "0.7.5"
 features = ["gpu_cache"]
 
 [lib]
