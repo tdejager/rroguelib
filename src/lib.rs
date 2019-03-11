@@ -1,6 +1,5 @@
 #[macro_use]
 extern crate glium;
-extern crate rusttype;
 
 use glium::{glutin, Surface};
 use rusttype::gpu_cache::Cache;
@@ -9,10 +8,9 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::error::Error;
 
-mod fonts;
 mod program;
-mod util;
 mod vertex;
+mod util;
 
 /// Main structure for accessing the roguelib library
 pub struct Roguelib<'a> {
@@ -126,10 +124,6 @@ impl<'a> Roguelib<'a> {
         );
     }
 
-    pub fn get_font(&mut self, name: String) -> Option<&mut RogueFont<'a>>{
-        self.fonts.get_mut(&name)
-    }
-
     /// Draw the specific string in a grid
     pub fn draw<S: Into<String>>(&mut self, display: &glium::Display, font: &str, render_string: S) {
         let (width, _): (u32, u32) = get_physical_dimensions(display)
@@ -137,7 +131,7 @@ impl<'a> Roguelib<'a> {
 
         let font = self.fonts.get_mut(font.into()).expect("Font does not exist");
 
-        let glyphs = util::layout_grid(&font.font, font.scale, width, &render_string.into());
+        let glyphs = crate::util::layout_grid(&font.font, font.scale, width, &render_string.into());
 
 //         Queue the glyphs in the program
         for glyph in &glyphs {

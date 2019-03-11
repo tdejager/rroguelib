@@ -3,7 +3,7 @@ use rusttype::gpu_cache::Cache;
 use rusttype::{point, vector, Font, PositionedGlyph, Rect, Scale};
 
 /// Create the text vertex buffer, this is the buffer that contains text rectangles
-pub fn create_text_vb(
+pub(crate) fn create_text_vb(
     display: &glium::Display,
     glyphs: &Vec<PositionedGlyph>,
     cache: &Cache,
@@ -76,7 +76,7 @@ pub fn create_text_vb(
 }
 
 /// Layout for a specific font in a grid
-pub fn layout_grid<'a>(
+pub(crate) fn layout_grid<'a>(
     font: &Font<'a>,
     scale: Scale,
     width: u32,
@@ -114,7 +114,7 @@ fn rescale(f: f32) -> f32 {
 }
 
 /// Create a grid, lines for easy display
-pub fn create_grid(
+pub(crate) fn create_grid(
     grid_x: f32,
     grid_y: f32,
     display: &glium::Display,

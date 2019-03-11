@@ -4,18 +4,18 @@ extern crate rusttype;
 extern crate unicode_normalization;
 
 //use rusttype::gpu_cache::CacheBuilder;
-use rusttype::{point, vector, Font, PositionedGlyph, Rect, Scale};
+
 
 use glium::{glutin, Surface};
-use rusttype::gpu_cache::Cache;
-use std::borrow::Cow;
+
+
 use std::error::Error;
 
 mod program;
 mod util;
 mod vertex;
 
-use self::vertex::{TextVertex, Vertex};
+
 use roguelib::{Roguelib};
 
 fn main() -> Result<(), Box<Error>> {
