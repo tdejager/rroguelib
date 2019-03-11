@@ -1,14 +1,4 @@
-#[macro_use]
-extern crate glium;
-extern crate rusttype;
-extern crate unicode_normalization;
-
-//use rusttype::gpu_cache::CacheBuilder;
-
-
-use glium::{glutin, Surface};
-
-
+use glium::{glutin};
 use std::error::Error;
 
 mod program;

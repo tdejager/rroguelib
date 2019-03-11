@@ -1,4 +1,4 @@
-use glium;
+use glium::program;
 
 pub fn create_grid_program(display: &glium::Display) -> glium::program::Program {
     let program = program!(display,
