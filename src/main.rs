@@ -27,12 +27,11 @@ fn main() -> Result<(), Box<Error>> {
     let mut roguelib = Roguelib::new(&display);
 
     let font_data = include_bytes!("../fonts/consola.ttf");
-    let font = Font::from_bytes(font_data as &[u8])?;
-    let mut finished = false;
 
     roguelib.add_font(&display, "default", font_data, 12.0);
 
     // Receive the inputs
+    let mut finished = false;
     loop {
         let display = &display;
         event_loop.poll_events(|event| {
@@ -72,8 +71,7 @@ fn main() -> Result<(), Box<Error>> {
             break;
         }
 
-        let font = roguelib.get_font("default".into()).expect("Font did not exist");
-        roguelib.draw(&display, font, "abcd");
+        roguelib.draw(&display, "default", "abcd");
 
     }
 

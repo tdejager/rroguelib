@@ -31,6 +31,7 @@ pub struct RogueFont<'a> {
     texture: glium::texture::Texture2d,
 }
 
+/// Create a window to use with the roguelib library
 pub fn create_window<S: Into<String>>(title: S) -> glutin::WindowBuilder {
     glutin::WindowBuilder::new()
         .with_dimensions((1920, 1080).into())
@@ -56,8 +57,8 @@ impl<'a> Roguelib<'a> {
     /// Initialize roguelib library stuff
     pub fn new(display: &glium::Display) -> Roguelib<'a> {
 
-        let context = glutin::ContextBuilder::new().with_vsync(true);
-        let event_loop = glutin::EventsLoop::new();
+        let _context = glutin::ContextBuilder::new().with_vsync(true);
+        let _event_loop = glutin::EventsLoop::new();
         let grid_program = crate::program::create_grid_program(&display);
         let text_program = crate::program::create_text_program(&display);
 
@@ -130,17 +131,19 @@ impl<'a> Roguelib<'a> {
     }
 
     /// Draw the specific string in a grid
-    pub fn draw<S: Into<String>>(&self, display: &glium::Display, font: &'a mut RogueFont<'a>, render_string: S) {
+    pub fn draw<S: Into<String>>(&mut self, display: &glium::Display, font: &str, render_string: S) {
         let (width, _): (u32, u32) = get_physical_dimensions(display)
             .expect("Could not retrieve window dimensions");
 
+        let font = self.fonts.get_mut(font.into()).expect("Font does not exist");
+
         let glyphs = util::layout_grid(&font.font, font.scale, width, &render_string.into());
 
-        // Queue the glyphs in the program
+//         Queue the glyphs in the program
         for glyph in &glyphs {
             font.cache.queue_glyph(0, glyph.clone());
         }
-
+//
         // Cache the rects
         let texture = &mut font.texture;
         font.cache
@@ -178,9 +181,9 @@ impl<'a> Roguelib<'a> {
         };
 
         // Create the vertex buffer and the grid
-        let mut text_vertex_buffer =
+        let text_vertex_buffer =
             crate::util::create_text_vb(display, &glyphs, &font.cache);
-        let (mut vb_grid, mut ib_grid) =
+        let (vb_grid, ib_grid) =
             crate::util::create_grid(font.max_font_width, font.max_font_height, display);
 
         let mut target = display.draw();

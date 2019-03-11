@@ -77,7 +77,7 @@ pub fn create_text_vb(
 
 /// Layout for a specific font in a grid
 pub fn layout_grid<'a>(
-    font: &'a Font,
+    font: &Font<'a>,
     scale: Scale,
     width: u32,
     text: &str,
