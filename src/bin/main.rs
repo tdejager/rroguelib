@@ -1,11 +1,6 @@
 use glium::{glutin};
 use std::error::Error;
 
-mod program;
-mod util;
-mod vertex;
-
-
 use roguelib::{Roguelib};
 
 fn main() -> Result<(), Box<Error>> {
@@ -16,7 +11,7 @@ fn main() -> Result<(), Box<Error>> {
     let display = glium::Display::new(window, context, &event_loop).unwrap();
     let mut roguelib = Roguelib::new(&display);
 
-    let font_data = include_bytes!("../fonts/consola.ttf");
+    let font_data = include_bytes!("../../fonts/consola.ttf");
 
     roguelib.add_font(&display, "default", font_data, 12.0);
 
