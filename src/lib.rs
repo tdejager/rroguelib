@@ -3,14 +3,14 @@ extern crate glium;
 
 use glium::{glutin, Surface};
 use rusttype::gpu_cache::Cache;
-use rusttype::{point, Font, Scale};
+use rusttype::{point, Font, Scale, Vector};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::error::Error;
 
 mod program;
-mod vertex;
 mod util;
+mod vertex;
 
 /// Main structure for accessing the roguelib library
 pub struct Roguelib<'a> {
@@ -37,24 +37,25 @@ pub fn create_window<S: Into<String>>(title: S) -> glutin::WindowBuilder {
 }
 
 /// Retrieve physical dimension for the display
-pub fn get_physical_dimensions(display: &glium::Display) -> Result<(u32, u32), Box<Error>> {
+pub fn get_physical_dimensions(display: &glium::Display) -> Result<(u32, u32), Box<dyn Error>> {
     let dimensions: (u32, u32) = display
         .gl_window()
+        .window()
         .get_inner_size()
         .ok_or("get_inner_size")?
         .to_physical(get_dpi(display))
         .into();
     Ok(dimensions)
 }
+
 /// Get dpi factor
 pub fn get_dpi(display: &glium::Display) -> f64 {
-    display.gl_window().get_hidpi_factor()
+    display.gl_window().window().get_hidpi_factor()
 }
 
 impl<'a> Roguelib<'a> {
     /// Initialize roguelib library stuff
     pub fn new(display: &glium::Display) -> Roguelib<'a> {
-
         let _context = glutin::ContextBuilder::new().with_vsync(true);
         let _event_loop = glutin::EventsLoop::new();
         let grid_program = crate::program::create_grid_program(&display);
@@ -68,10 +69,16 @@ impl<'a> Roguelib<'a> {
     }
 
     /// Use a font for drawing purposes
-    pub fn add_font<S: Into<String>>(&mut self, display: &glium::Display, name: S, font_bytes: &'static [u8], scale: f32) {
+    pub fn add_font<S: Into<String>>(
+        &mut self,
+        display: &glium::Display,
+        name: S,
+        font_bytes: &'static [u8],
+        scale: f32,
+    ) {
         let dpi = get_dpi(display);
-        let (width, height) = get_physical_dimensions(display)
-            .expect("Could not read window dimensions");
+        let (width, height) =
+            get_physical_dimensions(display).expect("Could not read window dimensions");
         let font = Font::from_bytes(font_bytes).expect("Could not create font");
         let scale = Scale::uniform(scale * dpi as f32);
 
@@ -125,19 +132,41 @@ impl<'a> Roguelib<'a> {
     }
 
     /// Draw the specific string in a grid
-    pub fn draw<S: Into<String>>(&mut self, display: &glium::Display, font: &str, render_string: S) {
-        let (width, _): (u32, u32) = get_physical_dimensions(display)
-            .expect("Could not retrieve window dimensions");
+    pub fn draw<S: Into<String>>(
+        &mut self,
+        display: &glium::Display,
+        font: &str,
+        render_string: S,
+    ) {
+        let (width, _): (u32, u32) =
+            get_physical_dimensions(display).expect("Could not retrieve window dimensions");
 
-        let font = self.fonts.get_mut(font.into()).expect("Font does not exist");
+        let font = self
+            .fonts
+            .get_mut(font.into())
+            .expect("Font does not exist");
+        let font_vec = Vector {
+            x: font.max_font_width,
+            y: font.max_font_height,
+        };
 
-        let glyphs = crate::util::layout_grid(&font.font, font.scale, width, &render_string.into());
+        let (grid, vb_grid, ib_grid) = crate::util::create_grid(
+            &font_vec,
+            &Vector {
+                x: 0.0,
+                y: font.font.v_metrics(font.scale).ascent,
+            },
+            display,
+        );
 
-//         Queue the glyphs in the program
+        let glyphs =
+            crate::util::layout_grid(&font.font, font.scale, width, &grid, &render_string.into());
+
+        //         Queue the glyphs in the program
         for glyph in &glyphs {
             font.cache.queue_glyph(0, glyph.clone());
         }
-//
+        //
         // Cache the rects
         let texture = &mut font.texture;
         font.cache
@@ -175,10 +204,7 @@ impl<'a> Roguelib<'a> {
         };
 
         // Create the vertex buffer and the grid
-        let text_vertex_buffer =
-            crate::util::create_text_vb(display, &glyphs, &font.cache);
-        let (vb_grid, ib_grid) =
-            crate::util::create_grid(font.max_font_width, font.max_font_height, display);
+        let text_vertex_buffer = crate::util::create_text_vb(display, &glyphs, &font.cache);
 
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -211,5 +237,4 @@ impl<'a> Roguelib<'a> {
 
         target.finish().expect("Could not execute finish command");
     }
-
 }

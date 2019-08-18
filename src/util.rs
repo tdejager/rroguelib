@@ -1,6 +1,7 @@
 use crate::vertex::{TextVertex, Vertex};
 use rusttype::gpu_cache::Cache;
-use rusttype::{point, vector, Font, PositionedGlyph, Rect, Scale};
+use rusttype::{point, vector, Font, PositionedGlyph, Rect, Scale, Vector};
+use unicode_normalization::UnicodeNormalization;
 
 /// Create the text vertex buffer, this is the buffer that contains text rectangles
 pub(crate) fn create_text_vb(
@@ -19,6 +20,7 @@ pub(crate) fn create_text_vb(
             .iter()
             .flat_map(|g| {
                 if let Ok(Some((uv_rect, screen_rect))) = cache.rect_for(0, g) {
+                    // Scale between 0..1 to -1..1
                     let gl_rect = Rect {
                         min: origin
                             + (vector(
@@ -31,6 +33,8 @@ pub(crate) fn create_text_vb(
                                 1.0 - screen_rect.max.y as f32 / screen_height - 0.5,
                             )) * 2.0,
                     };
+
+                    // Associate vertices with texture coords
                     arrayvec::ArrayVec::<[TextVertex; 6]>::from([
                         TextVertex {
                             position: [gl_rect.min.x, gl_rect.max.y],
@@ -80,31 +84,43 @@ pub(crate) fn layout_grid<'a>(
     font: &Font<'a>,
     scale: Scale,
     width: u32,
+    grid: &RogueGrid,
     text: &str,
 ) -> Vec<PositionedGlyph<'a>> {
-    use unicode_normalization::UnicodeNormalization;
+    //    use unicode_normalization::UnicodeNormalization;
+    //let mut result = Vec::new();
+    //let v_metrics = font.v_metrics(scale);
+
+    //let mut caret = point(0.0, v_metrics.ascent);
+
+    //let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
+
+    //for c in text.nfc() {
+    //let base_glyph = font.glyph(c);
+    //let mut glyph = base_glyph.scaled(scale).positioned(caret);
+
+    //if let Some(bb) = glyph.pixel_bounding_box() {
+    //if bb.max.x > width as i32 {
+    //caret = point(0.0, caret.y + advance_height);
+    //glyph = glyph.into_unpositioned().positioned(caret);
+    //} else {
+    //caret.x += glyph.unpositioned().h_metrics().advance_width as f32;
+    //println!("Caret {:?}", caret);
+    //}
+    //}
+    ////result.push(glyph);
+    //}
     let mut result = Vec::new();
-    let v_metrics = font.v_metrics(scale);
-
-    let mut caret = point(0.0, v_metrics.ascent);
-
-    let advance_height = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
-
+    let mut index = grid.totals.x;
     for c in text.nfc() {
         let base_glyph = font.glyph(c);
-        let mut glyph = base_glyph.scaled(scale).positioned(caret);
-
-        if let Some(bb) = glyph.pixel_bounding_box() {
-            if bb.max.x > width as i32 {
-                caret = point(0.0, caret.y + advance_height);
-                glyph = glyph.into_unpositioned().positioned(caret);
-            } else {
-                caret.x += glyph.unpositioned().h_metrics().advance_width as f32;
-            }
-        }
+        let grid_pos = grid.coordinates_for(index);
+        let glyph = base_glyph
+            .scaled(scale)
+            .positioned(point(grid_pos.x, grid_pos.y));
         result.push(glyph);
+        index += 1;
     }
-
     return result;
 }
 
@@ -113,36 +129,91 @@ fn rescale(f: f32) -> f32 {
     -1 as f32 + (f / 1.0 as f32) * 2 as f32
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct RogueGrid {
+    screen_dimensions: Vector<f32>,
+    grid_dimensions: Vector<f32>,
+    grid_padding: Vector<f32>,
+    totals: Vector<u32>
+}
+
+impl RogueGrid {
+    pub fn new(
+        screen_dimensions: &Vector<f32>,
+        grid_dimensions: &Vector<f32>,
+        grid_padding: &Vector<f32>,
+    ) -> RogueGrid {
+        let total_y =
+            f32::floor((screen_dimensions.y - grid_padding.y) / grid_dimensions.y);
+        let total_x = f32::floor((screen_dimensions.x - grid_padding.x) / grid_dimensions.x);
+        RogueGrid {
+            screen_dimensions: screen_dimensions.clone(),
+            grid_dimensions: grid_dimensions.clone(),
+            grid_padding: grid_padding.clone(),
+            totals: Vector{x: total_x as u32, y: total_y as u32}
+        }
+    }
+
+    /// Retrieve coordinates for a specific index
+    pub fn coordinates_for(&self, index: u32) -> Vector<f32> {
+        let x = index % self.totals.x;
+        let y = index / self.totals.x;
+
+        Vector {
+            x: x as f32 * self.grid_dimensions.x + self.grid_padding.x,
+            y: y as f32 * self.grid_dimensions.y + self.grid_padding.y,
+        }
+    }
+}
+
 /// Create a grid, lines for easy display
 pub(crate) fn create_grid(
-    grid_x: f32,
-    grid_y: f32,
+    grid_size: &Vector<f32>,
+    grid_padding: &Vector<f32>,
     display: &glium::Display,
-) -> (glium::VertexBuffer<Vertex>, glium::IndexBuffer<u16>) {
+) -> (
+    RogueGrid,
+    glium::VertexBuffer<Vertex>,
+    glium::IndexBuffer<u16>,
+) {
     let mut vertices: Vec<Vertex> = Vec::new();
+
+    // Get the screen dimensions
     let (screen_width, screen_height) = {
         let (w, h) = display.get_framebuffer_dimensions();
         (w as f32, h as f32)
     };
 
-    for y in 0..(screen_height / grid_y) as u32 {
+    // Create the rogue grid for grid calculations
+    let rogue_grid = RogueGrid::new(
+        &Vector {
+            x: screen_width,
+            y: screen_height,
+        },
+        grid_size,
+        grid_padding,
+    );
+
+    // Create vertex at ends of screen to create grid cells
+    for y in 0..((screen_height - grid_padding.y) / grid_size.y) as u32 {
         vertices.push(Vertex {
-            position: [-1.0, -rescale(y as f32 * grid_y / screen_height)],
+            position: [-1.0, -rescale((y as f32 * grid_size.y + grid_padding.y) / screen_height)],
             color: [1.0, 1.0, 1.0],
         });
         vertices.push(Vertex {
-            position: [1.0, -rescale(y as f32 * grid_y / screen_height)],
+            position: [1.0, -rescale((y as f32 * grid_size.y + grid_padding.y) / screen_height)],
             color: [1.0, 1.0, 1.0],
         });
     }
 
-    for x in 0..(screen_width / grid_x) as u32 {
+    // Create vertex at ends of screen to create the grid cells
+    for x in 0..((screen_width - grid_padding.x) / grid_size.x) as u32 {
         vertices.push(Vertex {
-            position: [rescale(x as f32 * grid_x / screen_width), -1.0],
+            position: [rescale((x as f32 * grid_size.x + grid_padding.x) / screen_width), -1.0],
             color: [1.0, 1.0, 1.0],
         });
         vertices.push(Vertex {
-            position: [rescale(x as f32 * grid_x / screen_width), 1.0],
+            position: [rescale((x as f32 * grid_size.x + grid_padding.x) / screen_width), 1.0],
             color: [1.0, 1.0, 1.0],
         });
     }
@@ -152,5 +223,5 @@ pub(crate) fn create_grid(
     let ib =
         glium::IndexBuffer::new(display, glium::index::PrimitiveType::LinesList, &indices).unwrap();
 
-    return (vb, ib);
+    return (rogue_grid, vb, ib);
 }
