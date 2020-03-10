@@ -4,22 +4,16 @@ use std::error::Error;
 use roguelib::Roguelib;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let window = roguelib::create_window("roguelike");
-
-    let mut event_loop = glutin::EventsLoop::new();
-    let context = glutin::ContextBuilder::new().with_vsync(true);
-    let display = glium::Display::new(window, context, &event_loop).unwrap();
-    let mut roguelib = Roguelib::new(&display);
+    let mut roguelib = Roguelib::new("roguelike");
 
     let font_data = include_bytes!("../../fonts/square.ttf");
 
-    roguelib.add_font(&display, "default", font_data, 18.0);
+    roguelib.add_font("default", font_data, 24.0);
 
     // Receive the inputs
     let mut finished = false;
     loop {
-        let display = &display;
-        event_loop.poll_events(|event| {
+        roguelib.event_loop.poll_events(|event| {
             use self::glutin::*;
 
             if let Event::WindowEvent { event, .. } = event {
@@ -56,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
 
-        roguelib.draw(&display, "default", "abcdefg@■");
+        roguelib.draw("default", "abcdefg@■");
     }
 
     Ok(())

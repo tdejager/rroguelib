@@ -17,6 +17,8 @@ pub struct Roguelib<'a> {
     fonts: HashMap<String, RogueFont<'a>>,
     grid_program: glium::Program,
     text_program: glium::Program,
+    pub display: glium::Display,
+    pub event_loop: glutin::EventsLoop,
 }
 
 /// A font to use with associated glium structures
@@ -55,30 +57,31 @@ pub fn get_dpi(display: &glium::Display) -> f64 {
 
 impl<'a> Roguelib<'a> {
     /// Initialize roguelib library stuff
-    pub fn new(display: &glium::Display) -> Roguelib<'a> {
-        let _context = glutin::ContextBuilder::new().with_vsync(true);
-        let _event_loop = glutin::EventsLoop::new();
+    pub fn new(s: &str) -> Roguelib<'a> {
+        let window = create_window(s);
+        let context = glutin::ContextBuilder::new().with_vsync(true);
+        let event_loop = glutin::EventsLoop::new();
+        let display = glium::Display::new(window, context, &event_loop).unwrap();
+
+        // Create the shaders for the grid
         let grid_program = crate::program::create_grid_program(&display);
+        // Create the shaders for the text rendering
         let text_program = crate::program::create_text_program(&display);
 
         Roguelib {
             fonts: HashMap::new(),
             grid_program,
             text_program,
+            display,
+            event_loop,
         }
     }
 
     /// Use a font for drawing purposes
-    pub fn add_font<S: Into<String>>(
-        &mut self,
-        display: &glium::Display,
-        name: S,
-        font_bytes: &'static [u8],
-        scale: f32,
-    ) {
-        let dpi = get_dpi(display);
+    pub fn add_font<S: Into<String>>(&mut self, name: S, font_bytes: &'static [u8], scale: f32) {
+        let dpi = get_dpi(&self.display);
         let (width, height) =
-            get_physical_dimensions(display).expect("Could not read window dimensions");
+            get_physical_dimensions(&self.display).expect("Could not read window dimensions");
         let font = Font::from_bytes(font_bytes).expect("Could not create font");
         let scale = Scale::uniform(scale * dpi as f32);
 
@@ -102,7 +105,7 @@ impl<'a> Roguelib<'a> {
 
         // Create the font texture
         let cache_tex = glium::texture::Texture2d::with_format(
-            display,
+            &self.display,
             glium::texture::RawImage2d {
                 data: Cow::Owned(vec![128u8; width as usize * height as usize]),
                 width,
@@ -132,14 +135,9 @@ impl<'a> Roguelib<'a> {
     }
 
     /// Draw the specific string in a grid
-    pub fn draw<S: Into<String>>(
-        &mut self,
-        display: &glium::Display,
-        font: &str,
-        render_string: S,
-    ) {
+    pub fn draw<S: Into<String>>(&mut self, font: &str, render_string: S) {
         let (width, _): (u32, u32) =
-            get_physical_dimensions(display).expect("Could not retrieve window dimensions");
+            get_physical_dimensions(&self.display).expect("Could not retrieve window dimensions");
 
         let font = self
             .fonts
@@ -156,7 +154,7 @@ impl<'a> Roguelib<'a> {
                 x: 0.0,
                 y: font.font.v_metrics(font.scale).ascent,
             },
-            display,
+            &self.display,
         );
 
         let glyphs =
@@ -204,9 +202,9 @@ impl<'a> Roguelib<'a> {
         };
 
         // Create the vertex buffer and the grid
-        let text_vertex_buffer = crate::util::create_text_vb(display, &glyphs, &font.cache);
+        let text_vertex_buffer = crate::util::create_text_vb(&self.display, &glyphs, &font.cache);
 
-        let mut target = display.draw();
+        let mut target = self.display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
 
         // Draw the grid lines
